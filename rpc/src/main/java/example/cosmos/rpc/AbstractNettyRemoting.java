@@ -1,7 +1,7 @@
 package example.cosmos.rpc;
 
-import example.cosmos.common.FrameworkErrorCode;
-import example.cosmos.common.FrameworkException;
+import example.cosmos.common.exception.FrameworkErrorCode;
+import example.cosmos.common.exception.FrameworkException;
 import example.cosmos.common.Pair;
 import example.cosmos.common.PositiveAtomicCounter;
 import io.netty.channel.Channel;
@@ -281,6 +281,24 @@ public abstract class AbstractNettyRemoting implements Disposable {
     }
 
 
+
+
+    private static final String SOCKET_ADDRESS_START_CHAR = "/";
+
+    public static String getSocketAddressStartChar() {
+        return SOCKET_ADDRESS_START_CHAR;
+    }
+
+    /**
+     * Gets address from context.
+     *
+     * @param ctx the ctx
+     * @return the address from context
+     */
+    protected String getAddressFromContext(ChannelHandlerContext ctx) {
+        return getAddressFromChannel(ctx.channel());
+    }
+
     /**
      * Gets address from channel.
      *
@@ -290,17 +308,17 @@ public abstract class AbstractNettyRemoting implements Disposable {
     protected String getAddressFromChannel(Channel channel) {
         SocketAddress socketAddress = channel.remoteAddress();
         String address = socketAddress.toString();
-        if (socketAddress.toString().indexOf(SOCKET_ADDRESS_START_CHAR) == 0) {
-            address = socketAddress.toString().substring(SOCKET_ADDRESS_START_CHAR.length());
+        if (socketAddress.toString().indexOf(NettyClientConfig.getSocketAddressStartChar()) == 0) {
+            address = socketAddress.toString().substring(NettyClientConfig.getSocketAddressStartChar().length());
         }
         return address;
     }
 
-    private static final String SOCKET_ADDRESS_START_CHAR = "/";
 
-    public static String getSocketAddressStartChar() {
-        return SOCKET_ADDRESS_START_CHAR;
-    }
-
-
+    /**
+     * Get transaction service group.
+     *
+     * @return transaction service group
+     */
+    protected abstract String getTransactionServiceGroup();
 }

@@ -16,12 +16,16 @@
 package example.cosmos.rpc.netty;
 
 import example.cosmos.common.CollectionUtils;
-import example.cosmos.common.FrameworkErrorCode;
-import example.cosmos.common.FrameworkException;
+import example.cosmos.common.ConfigurationKeys;
+import example.cosmos.common.StringUtils;
+import example.cosmos.common.exception.FrameworkErrorCode;
+import example.cosmos.common.exception.FrameworkException;
 import example.cosmos.common.NetUtil;
 import example.cosmos.rpc.NettyClientConfig;
 import example.cosmos.rpc.NettyPoolKey;
+import example.cosmos.rpc.registry.RegistryFactory;
 import example.cosmos.rpc.registry.RegistryService;
+import example.cosmos.rpc.registry.impl.FileRegistryServiceImpl;
 import io.netty.channel.Channel;
 import org.apache.commons.pool.impl.GenericKeyedObjectPool;
 import org.slf4j.Logger;
@@ -40,7 +44,7 @@ import java.util.stream.Collectors;
  * @author slievrly
  * @author zhaojun
  */
-class NettyClientChannelManager {
+public class NettyClientChannelManager {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(NettyClientChannelManager.class);
 
@@ -54,7 +58,7 @@ class NettyClientChannelManager {
 
     private Function<String, NettyPoolKey> poolKeyFunction;
 
-    NettyClientChannelManager(final NettyPoolableFactory keyPoolableFactory, final Function<String, NettyPoolKey> poolKeyFunction,
+   public  NettyClientChannelManager(final NettyPoolableFactory keyPoolableFactory, final Function<String, NettyPoolKey> poolKeyFunction,
                               final NettyClientConfig clientConfig) {
         nettyClientKeyPool = new GenericKeyedObjectPool<>(keyPoolableFactory);
         nettyClientKeyPool.setConfig(getNettyPoolConfig(clientConfig));
@@ -87,7 +91,7 @@ class NettyClientChannelManager {
      * @param serverAddress server address
      * @return netty channel
      */
-    Channel acquireChannel(String serverAddress) {
+    public  Channel acquireChannel(String serverAddress) {
         Channel channelToServer = channels.get(serverAddress);
         if (channelToServer != null) {
             channelToServer = getExistAliveChannel(channelToServer, serverAddress);
@@ -110,7 +114,7 @@ class NettyClientChannelManager {
      * @param channel channel
      * @param serverAddress server address
      */
-    void releaseChannel(Channel channel, String serverAddress) {
+    public   void releaseChannel(Channel channel, String serverAddress) {
         if (channel == null || serverAddress == null) { return; }
         try {
             synchronized (channelLocks.get(serverAddress)) {
@@ -139,7 +143,7 @@ class NettyClientChannelManager {
      * @param serverAddress server address
      * @param channel channel
      */
-    void destroyChannel(String serverAddress, Channel channel) {
+    public void destroyChannel(String serverAddress, Channel channel) {
         if (channel == null) { return; }
         try {
             if (channel.equals(channels.get(serverAddress))) {
@@ -156,7 +160,7 @@ class NettyClientChannelManager {
      *
      * @param transactionServiceGroup transaction service group
      */
-    void reconnect(String transactionServiceGroup) {
+    public void reconnect(String transactionServiceGroup) {
         List<String> availList = null;
         try {
             availList = getAvailServerList(transactionServiceGroup);
@@ -166,7 +170,7 @@ class NettyClientChannelManager {
         }
         if (CollectionUtils.isEmpty(availList)) {
             RegistryService registryService = RegistryFactory.getInstance();
-            String clusterName = registryService.getServiceGroup(transactionServiceGroup);
+            String clusterName = "default.clusterName";
 
             if (StringUtils.isBlank(clusterName)) {
                 LOGGER.error("can not get cluster name in registry config '{}{}', please make sure registry config correct",
@@ -205,11 +209,11 @@ class NettyClientChannelManager {
         }
     }
 
-    void invalidateObject(final String serverAddress, final Channel channel) throws Exception {
+    public   void invalidateObject(final String serverAddress, final Channel channel) throws Exception {
         nettyClientKeyPool.invalidateObject(poolKeyMap.get(serverAddress), channel);
     }
 
-    void registerChannel(final String serverAddress, final Channel channel) {
+    public  void registerChannel(final String serverAddress, final Channel channel) {
         Channel channelToServer = channels.get(serverAddress);
         if (channelToServer != null && channelToServer.isActive()) {
             return;
@@ -225,15 +229,7 @@ class NettyClientChannelManager {
         Channel channelFromPool;
         try {
             NettyPoolKey currentPoolKey = poolKeyFunction.apply(serverAddress);
-            if (currentPoolKey.getMessage() instanceof RegisterTMRequest) {
-                poolKeyMap.put(serverAddress, currentPoolKey);
-            } else {
-                NettyPoolKey previousPoolKey = poolKeyMap.putIfAbsent(serverAddress, currentPoolKey);
-                if (previousPoolKey != null && previousPoolKey.getMessage() instanceof RegisterRMRequest) {
-                    RegisterRMRequest registerRMRequest = (RegisterRMRequest) currentPoolKey.getMessage();
-                    ((RegisterRMRequest) previousPoolKey.getMessage()).setResourceIds(registerRMRequest.getResourceIds());
-                }
-            }
+            NettyPoolKey previousPoolKey = poolKeyMap.putIfAbsent(serverAddress, currentPoolKey);
             channelFromPool = nettyClientKeyPool.borrowObject(poolKeyMap.get(serverAddress));
             channels.put(serverAddress, channelFromPool);
         } catch (Exception exx) {

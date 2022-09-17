@@ -1,6 +1,6 @@
 package example.cosmos.rpc;
 
-import example.cosmos.common.FrameworkException;
+import example.cosmos.common.exception.FrameworkException;
 import example.cosmos.rpc.codec.ProtocolV1Decoder;
 import example.cosmos.rpc.codec.ProtocolV1Encoder;
 import io.netty.bootstrap.Bootstrap;

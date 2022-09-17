@@ -16,7 +16,7 @@
 package example.cosmos.rpc;
 
 
-import example.cosmos.common.ShouldNeverHappenException;
+import example.cosmos.common.exception.ShouldNeverHappenException;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;

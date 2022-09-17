@@ -15,6 +15,8 @@
  */
 package example.cosmos.common;
 
+import example.cosmos.common.exception.ShouldNeverHappenException;
+
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.lang.annotation.Annotation;

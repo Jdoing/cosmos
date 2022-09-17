@@ -15,7 +15,7 @@
  */
 package example.cosmos.rpc.netty;
 
-import example.cosmos.common.FrameworkException;
+import example.cosmos.common.exception.FrameworkException;
 import example.cosmos.common.NetUtil;
 import example.cosmos.rpc.AbstractNettyRemotingClient;
 import example.cosmos.rpc.NettyClientBootstrap;

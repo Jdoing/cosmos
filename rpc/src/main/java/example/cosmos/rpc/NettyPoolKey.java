@@ -15,6 +15,8 @@
  */
 package example.cosmos.rpc;
 
+import example.cosmos.rpc.protocol.AbstractMessage;
+
 /**
  * The type Netty pool key.
  *

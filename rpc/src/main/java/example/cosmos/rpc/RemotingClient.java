@@ -1,5 +1,6 @@
 package example.cosmos.rpc;
 
+import example.cosmos.rpc.protocol.AbstractMessage;
 import io.netty.channel.Channel;
 
 import java.util.concurrent.ExecutorService;

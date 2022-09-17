@@ -31,6 +31,24 @@ public class NettyClientConfig extends NettyBaseConfig {
     private static final boolean DEFAULT_POOL_TEST_RETURN = true;
     private static final boolean DEFAULT_POOL_LIFO = true;
 
+
+    /**
+     * Gets socket address start char.
+     *
+     * @return the socket address start char
+     */
+    public static String getSocketAddressStartChar() {
+        return SOCKET_ADDRESS_START_CHAR;
+    }
+    /**
+     * Get max acquire conn mills long.
+     *
+     * @return the long
+     */
+    public long getMaxAcquireConnMills() {
+        return MAX_ACQUIRE_CONN_MILLS;
+    }
+
     /**
      * Gets max check alive retry.
      *

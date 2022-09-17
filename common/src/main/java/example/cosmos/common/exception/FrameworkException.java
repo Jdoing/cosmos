@@ -13,7 +13,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-package example.cosmos.common;
+package example.cosmos.common.exception;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

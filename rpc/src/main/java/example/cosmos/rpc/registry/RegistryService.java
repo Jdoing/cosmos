@@ -95,21 +95,6 @@ public interface RegistryService<T> {
      */
     void close() throws Exception;
 
-    /**
-     * Get current service group name
-     *
-     * @param key service group
-     * @return the service group name
-     */
-    default String getServiceGroup(String key) {
-        key = PREFIX_SERVICE_ROOT + CONFIG_SPLIT_CHAR + PREFIX_SERVICE_MAPPING + key;
-        if (!SERVICE_GROUP_NAME.contains(key)) {
-            ConfigurationCache.addConfigListener(key);
-            SERVICE_GROUP_NAME.add(key);
-        }
-        return ConfigurationFactory.getInstance().getConfig(key);
-    }
-
     default List<InetSocketAddress> aliveLookup(String transactionServiceGroup) {
         return CURRENT_ADDRESS_MAP.computeIfAbsent(transactionServiceGroup, k -> new ArrayList<>());
     }
@@ -118,5 +103,13 @@ public interface RegistryService<T> {
         List<InetSocketAddress> aliveAddress) {
         return CURRENT_ADDRESS_MAP.put(transactionServiceGroup, aliveAddress);
     }
-
+    /**
+     * Get current service group name
+     *
+     * @param key service group
+     * @return the service group name
+     */
+    default String getServiceGroup(String key) {
+        return "default.service.group";
+    }
 }

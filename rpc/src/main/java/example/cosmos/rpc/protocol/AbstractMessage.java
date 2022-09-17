@@ -1,7 +1,7 @@
-package example.cosmos.rpc;
+package example.cosmos.rpc.protocol;
 
+import example.cosmos.rpc.MessageTypeAware;
 import io.netty.channel.ChannelHandlerContext;
-import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
