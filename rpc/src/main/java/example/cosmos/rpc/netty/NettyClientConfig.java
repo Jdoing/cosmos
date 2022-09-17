@@ -1,5 +1,7 @@
-package example.cosmos.rpc;
+package example.cosmos.rpc.netty;
 
+
+import example.cosmos.rpc.TransportServerType;
 
 import static example.cosmos.rpc.DefaultValues.*;
 
