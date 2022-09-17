@@ -143,4 +143,16 @@ public interface MessageType {
      * the constant TYPE_BATCH_RESULT_MSG
      */
     short TYPE_BATCH_RESULT_MSG = 121;
+
+
+    /**
+     * hello
+     */
+    short TYPE_HELLO = 1000;
+
+
+    /**
+     * ECHO
+     */
+    short TYPE_ECHO = 1001;
 }

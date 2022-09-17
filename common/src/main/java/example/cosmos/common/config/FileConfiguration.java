@@ -73,15 +73,13 @@ public class FileConfiguration extends AbstractConfiguration {
     private final FileListener fileListener = new FileListener();
 
     private final boolean allowDynamicRefresh;
+    private static final String NAME_KEY = "name";
+    private static final String FILE_TYPE = "file";
+    private static String pathDataId = String.join(ConfigurationKeys.FILE_CONFIG_SPLIT_CHAR,
+            ConfigurationKeys.FILE_ROOT_CONFIG, FILE_TYPE, NAME_KEY);
 
-    /**
-     * Note that:this constructor is only used to create proxy with CGLIB
-     * see io.seata.spring.boot.autoconfigure.provider.SpringBootConfigurationProvider#provide
-     */
     public FileConfiguration() {
-        this.name = null;
-        this.targetFilePath = null;
-        this.allowDynamicRefresh = false;
+        this(pathDataId);
     }
 
     /**
