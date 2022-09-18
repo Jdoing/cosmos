@@ -155,16 +155,28 @@ public class NettyServerBootstrap implements RemotingBootstrap {
                     if (channelHandlers != null) {
                         addChannelPipelineLast(ch, channelHandlers);
                     }
-
                 }
             });
 
         try {
-            this.serverBootstrap.bind(getListenPort()).sync();
+            ChannelFuture channelFuture = this.serverBootstrap.bind(getListenPort()).sync();
+            channelFuture.addListener(new ChannelFutureListener() {
+                @Override
+                public void operationComplete(ChannelFuture future) throws Exception {
+                    if (future.isSuccess()) {
+                        LOGGER.info("bind server success");
+                    } else {
+                        LOGGER.error("bind server fail");
+                    }
+                }
+            });
             XID.setPort(getListenPort());
             LOGGER.info("Server started, service listen port: {}", getListenPort());
             RegistryFactory.getInstance().register(new InetSocketAddress(XID.getIpAddress(), XID.getPort()));
             initialized.set(true);
+
+            ChannelFuture closeFuture=  channelFuture.channel().closeFuture();
+            closeFuture.sync();
         } catch (SocketException se) {
             throw new RuntimeException("Server start failed, the listen port: " + getListenPort(), se);
         } catch (Exception exx) {

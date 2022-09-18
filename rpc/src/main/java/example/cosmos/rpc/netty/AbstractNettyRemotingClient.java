@@ -1,21 +1,32 @@
 package example.cosmos.rpc.netty;
 
-import example.cosmos.common.exception.FrameworkErrorCode;
+import example.cosmos.common.CollectionUtils;
 import example.cosmos.common.NetUtil;
-import example.cosmos.rpc.*;
+import example.cosmos.common.Pair;
+import example.cosmos.common.StringUtils;
+import example.cosmos.common.exception.FrameworkErrorCode;
+import example.cosmos.common.exception.FrameworkException;
+import example.cosmos.rpc.ProtocolConstants;
+import example.cosmos.rpc.RemotingClient;
+import example.cosmos.rpc.RemotingProcessor;
+import example.cosmos.rpc.RpcMessage;
+import example.cosmos.rpc.loadbalance.LoadBalanceFactory;
 import example.cosmos.rpc.protocol.HeartbeatMessage;
-import io.netty.channel.ChannelDuplexHandler;
-import io.netty.channel.ChannelHandler;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelPromise;
+import example.cosmos.rpc.registry.RegistryFactory;
+import io.netty.channel.*;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.util.concurrent.EventExecutorGroup;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.lang.reflect.Field;
+import java.net.InetSocketAddress;
+import java.util.List;
 import java.util.concurrent.*;
 import java.util.function.Function;
+
+import static example.cosmos.common.exception.FrameworkErrorCode.NoAvailableService;
 
 /**
  * 2022/9/4 16:51
@@ -36,18 +47,11 @@ public abstract class AbstractNettyRemotingClient extends AbstractNettyRemoting 
     private static final String MERGE_THREAD_PREFIX = "rpcMergeMessageSend";
     protected final Object mergeLock = new Object();
 
-    /**
-     * When batch sending is enabled, the message will be stored to basketMap
-     * Send via asynchronous thread {@link MergedSendRunnable}
-     * {@link this#isEnableClientBatchSendRequest()}
-     */
-    protected final ConcurrentHashMap<String/*serverAddress*/, BlockingQueue<RpcMessage>> basketMap = new ConcurrentHashMap<>();
-
     private final NettyClientBootstrap clientBootstrap;
     private NettyClientChannelManager clientChannelManager;
     private final NettyPoolKey.TransactionRole transactionRole;
     private ExecutorService mergeSendExecutorService;
-//    private TransactionMessageHandler transactionMessageHandler;
+    //    private TransactionMessageHandler transactionMessageHandler;
     protected volatile boolean enableClientBatchSendRequest;
 
     @Override
@@ -164,5 +168,104 @@ public abstract class AbstractNettyRemotingClient extends AbstractNettyRemoting 
             }
             super.close(ctx, future);
         }
+    }
+
+    @Override
+    public Object sendSyncRequest(Object msg) throws TimeoutException {
+        String serverAddress = loadBalance(getTransactionServiceGroup(), msg);
+        long timeoutMillis = 1000;
+        RpcMessage rpcMessage = buildRequestMessage(msg, ProtocolConstants.MSGTYPE_RESQUEST_SYNC);
+
+        // send batch message
+        // put message into basketMap, @see MergedSendRunnable
+
+        Channel channel = clientChannelManager.acquireChannel(serverAddress);
+        return super.sendSync(channel, rpcMessage, timeoutMillis);
+
+    }
+
+    protected String loadBalance(String transactionServiceGroup, Object msg) {
+        InetSocketAddress address = null;
+        try {
+            @SuppressWarnings("unchecked")
+            List<InetSocketAddress> inetSocketAddressList = RegistryFactory.getInstance().aliveLookup(transactionServiceGroup);
+            address = this.doSelect(inetSocketAddressList, msg);
+        } catch (Exception ex) {
+            LOGGER.error(ex.getMessage());
+        }
+        if (address == null) {
+            throw new FrameworkException(NoAvailableService);
+        }
+        return NetUtil.toStringAddress(address);
+    }
+
+    protected InetSocketAddress doSelect(List<InetSocketAddress> list, Object msg) throws Exception {
+        if (CollectionUtils.isNotEmpty(list)) {
+            if (list.size() > 1) {
+                return LoadBalanceFactory.getInstance().select(list, getXid(msg));
+            } else {
+                return list.get(0);
+            }
+        }
+        return null;
+    }
+
+    protected String getXid(Object msg) {
+        String xid = "";
+        try {
+            Field field = msg.getClass().getDeclaredField("xid");
+            xid = String.valueOf(field.get(msg));
+        } catch (Exception ignore) {
+        }
+        return StringUtils.isBlank(xid) ? String.valueOf(ThreadLocalRandom.current().nextLong(Long.MAX_VALUE)) : xid;
+    }
+
+    @Override
+    public Object sendSyncRequest(Channel channel, Object msg) throws TimeoutException {
+        if (channel == null) {
+            LOGGER.warn("sendSyncRequest nothing, caused by null channel.");
+            return null;
+        }
+        RpcMessage rpcMessage = buildRequestMessage(msg, ProtocolConstants.MSGTYPE_RESQUEST_SYNC);
+        return super.sendSync(channel, rpcMessage, 1000);
+    }
+
+    @Override
+    public void sendAsyncRequest(Channel channel, Object msg) {
+        if (channel == null) {
+            LOGGER.warn("sendAsyncRequest nothing, caused by null channel.");
+            return;
+        }
+        RpcMessage rpcMessage = buildRequestMessage(msg, msg instanceof HeartbeatMessage
+                ? ProtocolConstants.MSGTYPE_HEARTBEAT_REQUEST
+                : ProtocolConstants.MSGTYPE_RESQUEST_ONEWAY);
+        super.sendAsync(channel, rpcMessage);
+    }
+
+    @Override
+    public void sendAsyncResponse(String serverAddress, RpcMessage rpcMessage, Object msg) {
+        RpcMessage rpcMsg = buildResponseMessage(rpcMessage, msg, ProtocolConstants.MSGTYPE_RESPONSE);
+        Channel channel = clientChannelManager.acquireChannel(serverAddress);
+        super.sendAsync(channel, rpcMsg);
+    }
+
+    @Override
+    public void registerProcessor(int requestCode, RemotingProcessor processor, ExecutorService executor) {
+        Pair<RemotingProcessor, ExecutorService> pair = new Pair<>(processor, executor);
+        this.processorTable.put(requestCode, pair);
+    }
+
+    @Override
+    public void destroyChannel(String serverAddress, Channel channel) {
+        clientChannelManager.destroyChannel(serverAddress, channel);
+    }
+
+    @Override
+    public void destroy() {
+        clientBootstrap.shutdown();
+        if (mergeSendExecutorService != null) {
+            mergeSendExecutorService.shutdown();
+        }
+        super.destroy();
     }
 }
