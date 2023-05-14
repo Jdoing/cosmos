@@ -16,16 +16,19 @@ import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.util.concurrent.DefaultEventExecutorGroup;
 import io.netty.util.concurrent.EventExecutorGroup;
 import io.netty.util.internal.PlatformDependent;
+import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.InetSocketAddress;
+import java.util.Date;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * 2022/9/4 16:53
  */
+@Slf4j
 public class NettyClientBootstrap implements RemotingBootstrap {
     private static final Logger LOGGER = LoggerFactory.getLogger(NettyClientBootstrap.class);
     private final NettyClientConfig nettyClientConfig;
@@ -123,7 +126,27 @@ public class NettyClientBootstrap implements RemotingBootstrap {
         if (initialized.compareAndSet(false, true) && LOGGER.isInfoEnabled()) {
             LOGGER.info("NettyClientBootstrap has started");
         }
+
+        connect(bootstrap, "127.0.0.1", 6888, 3);
     }
+    private void connect(Bootstrap bootstrap, String host, int port, int retry) {
+        ChannelFuture channelFuture = bootstrap.connect(host, port).addListener(future -> {
+            if (future.isSuccess()) {
+                log.info("连接服务端成功");
+            } else if (retry == 0) {
+                log.error("重试次数已用完，放弃连接");
+            } else {
+                //第几次重连：
+                int order = (3 - retry) + 1;
+                //本次重连的间隔
+                int delay = 1 << order;
+                log.error("{} : 连接失败，第 {} 重连....", new Date(), order);
+                bootstrap.config().group().schedule(() -> connect(bootstrap, host, port, retry - 1), delay, TimeUnit.SECONDS);
+            }
+        });
+        Channel channel = channelFuture.channel();
+    }
+
 
     @Override
     public void shutdown() {
