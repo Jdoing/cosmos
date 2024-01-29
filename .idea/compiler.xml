@@ -9,6 +9,7 @@
         <outputRelativeToContentRoot value="true" />
         <module name="common" />
         <module name="rpc" />
+        <module name="extension" />
       </profile>
     </annotationProcessing>
   </component>
