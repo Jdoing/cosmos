@@ -137,7 +137,7 @@ public abstract class AbstractNettyRemoting implements Disposable {
 
         channelWritableCheck(channel, rpcMessage.getBody());
 
-        String remoteAddr = ChannelUtil.getAddressFromChannel(channel);
+//        String remoteAddr = ChannelUtil.getAddressFromChannel(channel);
 
         channel.writeAndFlush(rpcMessage).addListener((ChannelFutureListener) future -> {
             if (!future.isSuccess()) {
@@ -145,7 +145,7 @@ public abstract class AbstractNettyRemoting implements Disposable {
                 if (messageFuture1 != null) {
                     messageFuture1.setResultMessage(future.cause());
                 }
-                destroyChannel(future.channel());
+//                destroyChannel(future.channel());
             }
         });
 

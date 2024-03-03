@@ -1,12 +1,15 @@
 package example.cosmos.rpc;
 
+import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
 
 /**
  * 2022/9/4 15:38
  */
-public class RpcMessage {
+public class RpcMessage implements Serializable {
+    private static final long serialVersionUID = 1L;
+
     private int id;
     private byte messageType;
     private byte codec;

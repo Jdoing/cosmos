@@ -14,6 +14,8 @@ import java.util.function.Function;
  */
 public class NettyRemoteClient extends AbstractNettyRemotingClient {
 
+
+
     public NettyRemoteClient(NettyClientConfig nettyClientConfig, EventExecutorGroup eventExecutorGroup, ThreadPoolExecutor messageExecutor, NettyPoolKey.TransactionRole transactionRole) {
         super(nettyClientConfig, eventExecutorGroup, messageExecutor, transactionRole);
 

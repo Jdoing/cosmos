@@ -48,6 +48,7 @@ import static example.cosmos.rpc.DefaultValues.SERVICE_DEFAULT_PORT;
 public class NettyServerBootstrap implements RemotingBootstrap {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(NettyServerBootstrap.class);
+    public static final String SERVER_PORT = "8091";
     private final ServerBootstrap serverBootstrap = new ServerBootstrap();
     private final EventLoopGroup eventLoopGroupWorker;
     private final EventLoopGroup eventLoopGroupBoss;
@@ -117,7 +118,7 @@ public class NettyServerBootstrap implements RemotingBootstrap {
         if (listenPort != 0) {
             return listenPort;
         }
-        String strPort = "8091";
+        String strPort = SERVER_PORT;
         int port = 0;
         try {
             port = Integer.parseInt(strPort);

@@ -15,6 +15,8 @@ import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.util.concurrent.DefaultEventExecutorGroup;
 import io.netty.util.concurrent.EventExecutorGroup;
+import io.netty.util.concurrent.Future;
+import io.netty.util.concurrent.GenericFutureListener;
 import io.netty.util.internal.PlatformDependent;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
@@ -39,6 +41,12 @@ public class NettyClientBootstrap implements RemotingBootstrap {
     private static final String THREAD_PREFIX_SPLIT_CHAR = "_";
     private final NettyPoolKey.TransactionRole transactionRole;
     private ChannelHandler[] channelHandlers;
+
+    private Channel channel;
+
+    public Channel getChannel() {
+        return channel;
+    }
 
     public NettyClientBootstrap(NettyClientConfig nettyClientConfig, final EventExecutorGroup eventExecutorGroup,
                                 NettyPoolKey.TransactionRole transactionRole) {
@@ -111,10 +119,11 @@ public class NettyClientBootstrap implements RemotingBootstrap {
                     @Override
                     public void initChannel(SocketChannel ch) {
                         ChannelPipeline pipeline = ch.pipeline();
-                        pipeline.addLast(
-                                        new IdleStateHandler(nettyClientConfig.getChannelMaxReadIdleSeconds(),
-                                                nettyClientConfig.getChannelMaxWriteIdleSeconds(),
-                                                nettyClientConfig.getChannelMaxAllIdleSeconds()))
+                        pipeline
+//                                .addLast(
+//                                        new IdleStateHandler(nettyClientConfig.getChannelMaxReadIdleSeconds(),
+//                                                nettyClientConfig.getChannelMaxWriteIdleSeconds(),
+//                                                nettyClientConfig.getChannelMaxAllIdleSeconds()))
                                 .addLast(new ProtocolV1Decoder())
                                 .addLast(new ProtocolV1Encoder());
                         if (channelHandlers != null) {
@@ -127,24 +136,34 @@ public class NettyClientBootstrap implements RemotingBootstrap {
             LOGGER.info("NettyClientBootstrap has started");
         }
 
-        connect(bootstrap, "127.0.0.1", 6888, 3);
+//        connect(bootstrap, "127.0.0.1", 8091, 3);
     }
-    private void connect(Bootstrap bootstrap, String host, int port, int retry) {
+
+    public Channel connect(String host, int port, int retry) {
         ChannelFuture channelFuture = bootstrap.connect(host, port).addListener(future -> {
             if (future.isSuccess()) {
                 log.info("连接服务端成功");
-            } else if (retry == 0) {
+            } else  {
                 log.error("重试次数已用完，放弃连接");
-            } else {
-                //第几次重连：
-                int order = (3 - retry) + 1;
-                //本次重连的间隔
-                int delay = 1 << order;
-                log.error("{} : 连接失败，第 {} 重连....", new Date(), order);
-                bootstrap.config().group().schedule(() -> connect(bootstrap, host, port, retry - 1), delay, TimeUnit.SECONDS);
             }
         });
+
+
+        try {
+            channelFuture.sync();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+
         Channel channel = channelFuture.channel();
+        channel.closeFuture().addListener(new GenericFutureListener<Future<? super Void>>() {
+            @Override
+            public void operationComplete(Future<? super Void> future) throws Exception {
+                log.info(new Date() + ": 连接已经断开……");
+            }
+        });
+
+       return channel;
     }
 
 

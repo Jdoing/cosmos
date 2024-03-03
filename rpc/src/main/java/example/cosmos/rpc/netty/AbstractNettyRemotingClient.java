@@ -6,10 +6,7 @@ import example.cosmos.common.Pair;
 import example.cosmos.common.StringUtils;
 import example.cosmos.common.exception.FrameworkErrorCode;
 import example.cosmos.common.exception.FrameworkException;
-import example.cosmos.rpc.ProtocolConstants;
-import example.cosmos.rpc.RemotingClient;
-import example.cosmos.rpc.RemotingProcessor;
-import example.cosmos.rpc.RpcMessage;
+import example.cosmos.rpc.*;
 import example.cosmos.rpc.loadbalance.LoadBalanceFactory;
 import example.cosmos.rpc.protocol.HeartbeatMessage;
 import example.cosmos.rpc.registry.RegistryFactory;
@@ -34,47 +31,50 @@ import static example.cosmos.common.exception.FrameworkErrorCode.NoAvailableServ
 public abstract class AbstractNettyRemotingClient extends AbstractNettyRemoting implements RemotingClient {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(AbstractNettyRemotingClient.class);
-    private static final String MSG_ID_PREFIX = "msgId:";
-    private static final String FUTURES_PREFIX = "futures:";
-    private static final String SINGLE_LOG_POSTFIX = ";";
-    private static final int MAX_MERGE_SEND_MILLS = 1;
-    private static final String THREAD_PREFIX_SPLIT_CHAR = "_";
-
-    private static final int MAX_MERGE_SEND_THREAD = 1;
-    private static final long KEEP_ALIVE_TIME = Integer.MAX_VALUE;
-    private static final long SCHEDULE_DELAY_MILLS = 60 * 1000L;
-    private static final long SCHEDULE_INTERVAL_MILLS = 10 * 1000L;
-    private static final String MERGE_THREAD_PREFIX = "rpcMergeMessageSend";
-    protected final Object mergeLock = new Object();
 
     private final NettyClientBootstrap clientBootstrap;
-    private NettyClientChannelManager clientChannelManager;
-    private final NettyPoolKey.TransactionRole transactionRole;
-    private ExecutorService mergeSendExecutorService;
-    //    private TransactionMessageHandler transactionMessageHandler;
-    protected volatile boolean enableClientBatchSendRequest;
+
+    private final ConcurrentMap<String /* addr */, Channel> channelTables = new ConcurrentHashMap<>();
 
     @Override
     public void init() {
-        timerExecutor.scheduleAtFixedRate(new Runnable() {
-            @Override
-            public void run() {
-                clientChannelManager.reconnect(getTransactionServiceGroup());
-            }
-        }, SCHEDULE_DELAY_MILLS, SCHEDULE_INTERVAL_MILLS, TimeUnit.MILLISECONDS);
+//        timerExecutor.scheduleAtFixedRate(new Runnable() {
+//            @Override
+//            public void run() {
+//                clientChannelManager.reconnect(getTransactionServiceGroup());
+//            }
+//        }, SCHEDULE_DELAY_MILLS, SCHEDULE_INTERVAL_MILLS, TimeUnit.MILLISECONDS);
 
         super.init();
         clientBootstrap.start();
     }
 
+    public synchronized Channel getOrCreateChannel(String addr) {
+        String[] serverArr = addr.split(":");
+        String host = serverArr[0];
+        int port = Integer.parseInt(serverArr[1]);
+
+        Channel channel = channelTables.get(addr);
+        if (channel == null) {
+            channel =  clientBootstrap.connect(host, port, 3);
+            channelTables.put(addr, channel);
+        }
+
+        return channel;
+    }
+
+    private String getAddr(String host, int port) {
+        return  host + ":" + port;
+    }
+
+
     public AbstractNettyRemotingClient(NettyClientConfig nettyClientConfig, EventExecutorGroup eventExecutorGroup,
                                        ThreadPoolExecutor messageExecutor, NettyPoolKey.TransactionRole transactionRole) {
         super(messageExecutor);
-        this.transactionRole = transactionRole;
         clientBootstrap = new NettyClientBootstrap(nettyClientConfig, eventExecutorGroup, transactionRole);
         clientBootstrap.setChannelHandlers(new ClientHandler());
-        clientChannelManager = new NettyClientChannelManager(
-                new NettyPoolableFactory(this, clientBootstrap), getPoolKeyFunction(), nettyClientConfig);
+//        clientChannelManager = new NettyClientChannelManager(
+//                new NettyPoolableFactory(this, clientBootstrap), getPoolKeyFunction(), nettyClientConfig);
     }
 
     /**
@@ -116,7 +116,7 @@ public abstract class AbstractNettyRemotingClient extends AbstractNettyRemoting 
             if (LOGGER.isInfoEnabled()) {
                 LOGGER.info("channel inactive: {}", ctx.channel());
             }
-            clientChannelManager.releaseChannel(ctx.channel(), NetUtil.toStringAddress(ctx.channel().remoteAddress()));
+//            clientChannelManager.releaseChannel(ctx.channel(), NetUtil.toStringAddress(ctx.channel().remoteAddress()));
             super.channelInactive(ctx);
         }
 
@@ -130,11 +130,11 @@ public abstract class AbstractNettyRemotingClient extends AbstractNettyRemoting 
                     }
                     try {
                         String serverAddress = NetUtil.toStringAddress(ctx.channel().remoteAddress());
-                        clientChannelManager.invalidateObject(serverAddress, ctx.channel());
+//                        clientChannelManager.invalidateObject(serverAddress, ctx.channel());
                     } catch (Exception exx) {
                         LOGGER.error(exx.getMessage());
                     } finally {
-                        clientChannelManager.releaseChannel(ctx.channel(), getAddressFromContext(ctx));
+//                        clientChannelManager.releaseChannel(ctx.channel(), getAddressFromContext(ctx));
                     }
                 }
                 if (idleStateEvent == IdleStateEvent.WRITER_IDLE_STATE_EVENT) {
@@ -154,7 +154,7 @@ public abstract class AbstractNettyRemotingClient extends AbstractNettyRemoting 
         public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
             LOGGER.error(FrameworkErrorCode.ExceptionCaught.getErrCode(),
                     NetUtil.toStringAddress(ctx.channel().remoteAddress()) + "connect exception. " + cause.getMessage(), cause);
-            clientChannelManager.releaseChannel(ctx.channel(), getAddressFromChannel(ctx.channel()));
+//            clientChannelManager.releaseChannel(ctx.channel(), getAddressFromChannel(ctx.channel()));
             if (LOGGER.isInfoEnabled()) {
                 LOGGER.info("remove exception rm channel:{}", ctx.channel());
             }
@@ -171,15 +171,18 @@ public abstract class AbstractNettyRemotingClient extends AbstractNettyRemoting 
     }
 
     @Override
-    public Object sendSyncRequest(Object msg) throws TimeoutException {
-        String serverAddress = loadBalance(getTransactionServiceGroup(), msg);
-        long timeoutMillis = 1000;
+    public Object sendSyncRequest(String addr, Object msg) throws TimeoutException {
+//        String serverAddress = loadBalance(getTransactionServiceGroup(), msg);
+
+        long timeoutMillis = 100000;
         RpcMessage rpcMessage = buildRequestMessage(msg, ProtocolConstants.MSGTYPE_RESQUEST_SYNC);
+//        RpcMessage rpcMessage = buildRequestMessage(msg, MessageType.TYPE_ECHO);
 
         // send batch message
         // put message into basketMap, @see MergedSendRunnable
 
-        Channel channel = clientChannelManager.acquireChannel(serverAddress);
+        Channel channel = getOrCreateChannel(addr);
+
         return super.sendSync(channel, rpcMessage, timeoutMillis);
 
     }
@@ -194,7 +197,9 @@ public abstract class AbstractNettyRemotingClient extends AbstractNettyRemoting 
             LOGGER.error(ex.getMessage());
         }
         if (address == null) {
-            throw new FrameworkException(NoAvailableService);
+
+            return "127.0.0.1:8091";
+//            throw new FrameworkException(NoAvailableService);
         }
         return NetUtil.toStringAddress(address);
     }
@@ -227,7 +232,7 @@ public abstract class AbstractNettyRemotingClient extends AbstractNettyRemoting 
             return null;
         }
         RpcMessage rpcMessage = buildRequestMessage(msg, ProtocolConstants.MSGTYPE_RESQUEST_SYNC);
-        return super.sendSync(channel, rpcMessage, 1000);
+        return super.sendSync(channel, rpcMessage, 100000);
     }
 
     @Override
@@ -245,7 +250,7 @@ public abstract class AbstractNettyRemotingClient extends AbstractNettyRemoting 
     @Override
     public void sendAsyncResponse(String serverAddress, RpcMessage rpcMessage, Object msg) {
         RpcMessage rpcMsg = buildResponseMessage(rpcMessage, msg, ProtocolConstants.MSGTYPE_RESPONSE);
-        Channel channel = clientChannelManager.acquireChannel(serverAddress);
+        Channel channel = getOrCreateChannel(serverAddress);
         super.sendAsync(channel, rpcMsg);
     }
 
@@ -257,15 +262,15 @@ public abstract class AbstractNettyRemotingClient extends AbstractNettyRemoting 
 
     @Override
     public void destroyChannel(String serverAddress, Channel channel) {
-        clientChannelManager.destroyChannel(serverAddress, channel);
+//        clientChannelManager.destroyChannel(serverAddress, channel);
     }
 
     @Override
     public void destroy() {
         clientBootstrap.shutdown();
-        if (mergeSendExecutorService != null) {
-            mergeSendExecutorService.shutdown();
-        }
+//        if (mergeSendExecutorService != null) {
+//            mergeSendExecutorService.shutdown();
+//        }
         super.destroy();
     }
 }

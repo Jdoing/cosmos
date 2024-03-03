@@ -39,12 +39,7 @@ public class NettyRemotingServer extends AbstractNettyRemotingServer {
     private static final Logger LOGGER = LoggerFactory.getLogger(NettyRemotingServer.class);
 
     private final AtomicBoolean initialized = new AtomicBoolean(false);
-
-    private ThreadPoolExecutor branchResultMessageExecutor = new ThreadPoolExecutor(NettyServerConfig.getMinBranchResultPoolSize(),
-            NettyServerConfig.getMaxBranchResultPoolSize(), NettyServerConfig.getKeepAliveTime(), TimeUnit.SECONDS,
-            new LinkedBlockingQueue<>(NettyServerConfig.getMaxTaskQueueSize()),
-            new NamedThreadFactory("BranchResultHandlerThread", NettyServerConfig.getMaxBranchResultPoolSize()), new ThreadPoolExecutor.CallerRunsPolicy());
-
+    
     @Override
     public void init() {
         // registry processor
@@ -85,7 +80,6 @@ public class NettyRemotingServer extends AbstractNettyRemotingServer {
     @Override
     public void destroy() {
         super.destroy();
-        branchResultMessageExecutor.shutdown();
     }
 
     @Override

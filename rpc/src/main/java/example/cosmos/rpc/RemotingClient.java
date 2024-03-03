@@ -19,7 +19,7 @@ public interface RemotingClient {
      * @return server result message
      * @throws TimeoutException TimeoutException
      */
-    Object sendSyncRequest(Object msg) throws TimeoutException;
+    Object sendSyncRequest(String addr, Object msg) throws TimeoutException;
 
     /**
      * client send sync request.
